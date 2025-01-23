@@ -1,6 +1,9 @@
 {
   "name": "@matt.kantor/parsing",
   "version": "0.0.0",
+  "dependencies": {
+    "@matt.kantor/either": "^1.0.0"
+  },
   "devDependencies": {
     "typescript": "^5.7.3"
   },
