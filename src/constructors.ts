@@ -18,7 +18,7 @@ export const anySingleCharacter: Parser<string> = input => {
 }
 
 export const literal =
-  (text: string): Parser<string> =>
+  <Text extends string>(text: Text): Parser<Text> =>
   input =>
     input.startsWith(text)
       ? either.makeRight({
