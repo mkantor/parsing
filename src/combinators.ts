@@ -1,6 +1,11 @@
-import either from '@matt.kantor/either'
+import either, { type Either } from '@matt.kantor/either'
 import { nothing } from './constructors.js'
-import type { AlwaysSucceedingParser, Parser, Success } from './parser.js'
+import type {
+  AlwaysSucceedingParser,
+  InvalidInputError,
+  Parser,
+  Success,
+} from './parser.js'
 
 export const as =
   <NewOutput>(
@@ -150,6 +155,19 @@ export const sequence =
 type SequenceOutput<Parsers extends readonly Parser<unknown>[]> = {
   [Index in keyof Parsers]: OutputOf<Parsers[Index]>
 }
+
+export const transformOutput =
+  <Output, NewOutput>(
+    parser: Parser<Output>,
+    f: (output: Output) => Either<InvalidInputError, NewOutput>,
+  ): Parser<NewOutput> =>
+  input =>
+    either.flatMap(parser(input), success =>
+      either.map(f(success.output), output => ({
+        output,
+        remainingInput: success.remainingInput,
+      })),
+    )
 
 export const zeroOrMore =
   <Output>(parser: Parser<Output>): AlwaysSucceedingParser<readonly Output[]> =>
