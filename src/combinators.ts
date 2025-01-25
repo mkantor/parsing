@@ -147,10 +147,12 @@ export const sequence =
           }),
         either.makeRight({ remainingInput: input, output: [] }), // `parsers` is non-empty so this is never returned
       ),
-      // The above `reduce` constructs the output to be concordant with this
-      // type, but TypeScript doesn't know that.
-      // TODO: Consider tightening `reduce`'s signature instead.
-      output => output as Success<SequenceOutput<Parsers>>,
+      ({ output, remainingInput }) => ({
+        // The above `reduce` callback constructs `output` such that its
+        // elements align with `Parsers`, but TypeScript doesn't know that.
+        output: output as SequenceOutput<Parsers>,
+        remainingInput,
+      }),
     )
 type SequenceOutput<Parsers extends readonly Parser<unknown>[]> = {
   [Index in keyof Parsers]: OutputOf<Parsers[Index]>
