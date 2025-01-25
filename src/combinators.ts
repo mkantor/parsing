@@ -32,6 +32,17 @@ export const butNot =
       }
     })
 
+export const flatMap =
+  <Output, NewOutput>(
+    parser: Parser<Output>,
+    f: (output: Output) => Parser<NewOutput>,
+  ): Parser<NewOutput> =>
+  input =>
+    either.flatMap(parser(input), success => {
+      const nextParser = f(success.output)
+      return nextParser(success.remainingInput)
+    })
+
 export const lazy =
   <Output>(parser: () => Parser<Output>): Parser<Output> =>
   input =>
