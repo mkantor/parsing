@@ -110,10 +110,8 @@ type OneOfOutput<Parsers extends readonly Parser<unknown>[]> = {
 
 export const oneOrMore = <Output>(
   parser: Parser<Output>,
-): Parser<readonly Output[]> =>
-  map(sequence([map(parser, output => [output]), zeroOrMore(parser)]), output =>
-    output.flat(),
-  )
+): Parser<readonly [Output, ...(readonly Output[])]> =>
+  map(sequence([parser, zeroOrMore(parser)]), ([head, tail]) => [head, ...tail])
 
 /**
  * Apply the given `parsers` in order to the input, requiring all to succeed.
