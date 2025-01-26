@@ -27,7 +27,7 @@ export const literal =
         })
       : either.makeLeft({
           input,
-          message: `input did not begin with \`${text}\``,
+          message: `input did not begin with "${text}"`,
         })
 
 export const nothing: ParserWhichAlwaysSucceeds<undefined> = input =>
