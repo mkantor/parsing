@@ -7,6 +7,9 @@ import type {
   Success,
 } from './parser.js'
 
+/**
+ * Substitute the output of a successful parse.
+ */
 export const as =
   <NewOutput>(
     parser: Parser<unknown>,
@@ -18,6 +21,15 @@ export const as =
       remainingInput: success.remainingInput,
     }))
 
+/**
+ * Attempt to parse input with `parser`. If successful, ensure the same input
+ * does _not_ successfully parse with `not`.
+ *
+ * @example
+ * ```ts
+ * butNot(anySingleCharacter, literal('a'), 'the letter a') // parses any character besides 'a'
+ * ```
+ */
 export const butNot =
   <Output>(
     parser: Parser<Output>,
@@ -37,6 +49,10 @@ export const butNot =
       }
     })
 
+/**
+ * Map the output of `parser` to another `Parser` which is then applied to the
+ * remaining input, flattening the parse results.
+ */
 export const flatMap =
   <Output, NewOutput>(
     parser: Parser<Output>,
@@ -48,11 +64,23 @@ export const flatMap =
       return nextParser(success.remainingInput)
     })
 
+/**
+ * Create a `Parser` from a thunk. This can be useful for recursive parsers.
+ */
 export const lazy =
   <Output>(parser: () => Parser<Output>): Parser<Output> =>
   input =>
     parser()(input)
 
+/**
+ * Attempt to parse input with `parser`. If successful, ensure the remaining
+ * input does _not_ successfully parse with `notFollowedBy`.
+ *
+ * @example
+ * ```ts
+ * lookaheadNot(anySingleCharacter, literal('a'), 'the letter a') // parses the first character of 'ab', but not 'aa'
+ * ```
+ */
 export const lookaheadNot =
   <Output>(
     parser: Parser<Output>,
@@ -71,6 +99,9 @@ export const lookaheadNot =
       }),
     )
 
+/**
+ * Map the output of `parser` to new output.
+ */
 export const map =
   <Output, NewOutput>(
     parser: Parser<Output>,
@@ -108,6 +139,10 @@ type OneOfOutput<Parsers extends readonly Parser<unknown>[]> = {
   [Index in keyof Parsers]: OutputOf<Parsers[Index]>
 }[number]
 
+/**
+ * Repeatedly apply `parser` to the input as long as it keeps succeeding,
+ * requiring at least one success. Outputs are collected in an array.
+ */
 export const oneOrMore = <Output>(
   parser: Parser<Output>,
 ): Parser<readonly [Output, ...(readonly Output[])]> =>
@@ -156,6 +191,9 @@ type SequenceOutput<Parsers extends readonly Parser<unknown>[]> = {
   [Index in keyof Parsers]: OutputOf<Parsers[Index]>
 }
 
+/**
+ * Refine/transform the output of `parser` via a function which may fail.
+ */
 export const transformOutput =
   <Output, NewOutput>(
     parser: Parser<Output>,
@@ -169,6 +207,10 @@ export const transformOutput =
       })),
     )
 
+/**
+ * Repeatedly apply `parser` to the input as long as it keeps succeeding.
+ * Outputs are collected in an array.
+ */
 export const zeroOrMore =
   <Output>(parser: Parser<Output>): AlwaysSucceedingParser<readonly Output[]> =>
   input => {
