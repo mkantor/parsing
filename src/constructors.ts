@@ -1,5 +1,5 @@
 import either from '@matt.kantor/either'
-import type { AlwaysSucceedingParser, Parser } from './parser.js'
+import type { Parser, ParserWhichAlwaysSucceeds } from './parser.js'
 
 export const anySingleCharacter: Parser<string> = input => {
   const firstCodePoint = input.codePointAt(0)
@@ -30,7 +30,7 @@ export const literal =
           message: `input did not begin with \`${text}\``,
         })
 
-export const nothing: AlwaysSucceedingParser<undefined> = input =>
+export const nothing: ParserWhichAlwaysSucceeds<undefined> = input =>
   either.makeRight({
     remainingInput: input,
     output: undefined,

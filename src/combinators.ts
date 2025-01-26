@@ -1,9 +1,9 @@
 import either, { type Either } from '@matt.kantor/either'
 import { nothing } from './constructors.js'
 import type {
-  AlwaysSucceedingParser,
   InvalidInputError,
   Parser,
+  ParserWhichAlwaysSucceeds,
   Success,
 } from './parser.js'
 
@@ -212,7 +212,9 @@ export const transformOutput =
  * Outputs are collected in an array.
  */
 export const zeroOrMore =
-  <Output>(parser: Parser<Output>): AlwaysSucceedingParser<readonly Output[]> =>
+  <Output>(
+    parser: Parser<Output>,
+  ): ParserWhichAlwaysSucceeds<readonly Output[]> =>
   input => {
     const result = oneOf([parser, nothing])(input)
     const success = either.match(result, {

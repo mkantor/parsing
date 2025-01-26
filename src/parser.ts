@@ -14,6 +14,6 @@ export type Parser<Output> = (
   input: string,
 ) => Either<InvalidInputError, Success<Output>>
 
-export type AlwaysSucceedingParser<Output> = (
+export type ParserWhichAlwaysSucceeds<Output> = (
   input: string,
 ) => Right<Success<Output>>
