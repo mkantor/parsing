@@ -1,4 +1,4 @@
-import either from '@matt.kantor/either'
+import * as either from '@matt.kantor/either'
 import type { Parser, ParserWhichAlwaysSucceeds } from './parser.js'
 
 export const anySingleCharacter: Parser<string> = input => {

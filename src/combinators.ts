@@ -1,4 +1,5 @@
-import either, { type Either } from '@matt.kantor/either'
+import type { Either } from '@matt.kantor/either'
+import * as either from '@matt.kantor/either'
 import { nothing } from './constructors.js'
 import type {
   InvalidInputError,
