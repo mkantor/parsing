@@ -34,6 +34,8 @@ export const parse = <Output>(
     remainingInput.length !== 0
       ? either.makeLeft({
           input,
+          output,
+          remainingInput,
           message: 'excess content followed valid input',
         })
       : either.makeRight(output),
