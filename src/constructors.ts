@@ -36,11 +36,13 @@ export const nothing: ParserWhichAlwaysSucceeds<undefined> = input =>
     output: undefined,
   })
 
-export const regularExpression =
-  (pattern: RegExp): Parser<string> =>
-  input => {
-    const match = pattern.exec(input)
-    return match === null || match.index !== 0
+export const regularExpression = (pattern: RegExp): Parser<string> => {
+  const patternAnchoredToStartOfString = pattern.source.startsWith('^')
+    ? pattern
+    : new RegExp(`^${pattern.source}`, pattern.flags)
+  return input => {
+    const match = patternAnchoredToStartOfString.exec(input)
+    return match === null
       ? either.makeLeft({
           input,
           message: 'input did not match regular expression',
@@ -50,3 +52,4 @@ export const regularExpression =
           output: match[0],
         })
   }
+}
