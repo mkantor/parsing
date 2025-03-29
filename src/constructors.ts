@@ -17,9 +17,9 @@ export const anySingleCharacter: Parser<string> = input => {
   }
 }
 
-export const literal =
-  <Text extends string>(text: Text): Parser<Text> =>
-  input =>
+export const literal = <Text extends string>(text: Text): Parser<Text> => {
+  const errorMessage = `input did not begin with "${text}"`
+  return input =>
     input.startsWith(text)
       ? either.makeRight({
           remainingInput: input.slice(text.length),
@@ -27,8 +27,9 @@ export const literal =
         })
       : either.makeLeft({
           input,
-          message: `input did not begin with "${text}"`,
+          message: errorMessage,
         })
+}
 
 export const nothing: ParserWhichAlwaysSucceeds<undefined> = input =>
   either.makeRight({
