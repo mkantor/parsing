@@ -5,6 +5,7 @@
     "@matt.kantor/either": "^1.0.0"
   },
   "devDependencies": {
+    "@types/node": "^22.13.14",
     "typescript": "^5.7.3"
   },
   "files": [
@@ -14,8 +15,10 @@
   "main": "dist/index.js",
   "repository": "github:mkantor/parsing",
   "scripts": {
-    "clean": "rm -rf dist *.tsbuildinfo",
-    "build": "tsc --build"
+    "clean": "rm -rf dist* *.tsbuildinfo",
+    "build": "tsc --build tsconfig.lib.json",
+    "build:tests": "tsc --project tsconfig.lib.json --outDir dist-test --declarationDir dist && tsc --build tsconfig.test.json",
+    "test": "npm run build:tests && node --test"
   },
   "type": "module"
 }
