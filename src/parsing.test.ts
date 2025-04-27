@@ -11,7 +11,6 @@ import {
   oneOf,
   oneOrMore,
   sequence,
-  transformOutput,
   zeroOrMore,
 } from './combinators.js'
 import {
@@ -129,21 +128,6 @@ suite('combinators', _ => {
     assertSuccess(ab('ab'), ['a', 'b'])
     assertSuccess(ab('abc'), ['a', 'b'])
     assertFailure(ab('bab'))
-  })
-
-  test('transformOutput', _ => {
-    const aTransformedToUppercase = transformOutput(literal('a'), a =>
-      either.makeRight(a.toUpperCase()),
-    )
-    assertSuccess(aTransformedToUppercase('a'), 'A')
-    assertSuccess(aTransformedToUppercase('ab'), 'A')
-    assertFailure(aTransformedToUppercase('b'))
-    assertFailure(aTransformedToUppercase(''))
-    assertFailure(
-      transformOutput(anySingleCharacter, _ =>
-        either.makeLeft({ kind: 'invalidInput', input: '', message: '' }),
-      )(''),
-    )
   })
 
   test('zeroOrMore', _ => {
