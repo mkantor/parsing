@@ -6,13 +6,13 @@ export type InvalidInputError = {
   readonly message: string
 }
 
-export type Parser<Output> = (
-  input: string,
-) => Either<InvalidInputError, Success<Output>>
+export type Parser<Output> = (input: string) => ParserResult<Output>
 
 export type ParserWhichAlwaysSucceeds<Output> = (
   input: string,
 ) => Right<Success<Output>>
+
+export type ParserResult<Output> = Either<InvalidInputError, Success<Output>>
 
 export type Success<Output> = {
   readonly remainingInput: string
