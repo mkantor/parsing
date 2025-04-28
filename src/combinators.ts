@@ -54,7 +54,7 @@ export const butNot = <Output>(
 
 /**
  * Map the output of `parser` to another `Parser` which is then applied to the
- * remaining input, flattening the parse results.
+ * remaining input, returning the result of the second parser upon success.
  */
 export const flatMap = <Output, NewOutput>(
   parser: Parser<Output>,
