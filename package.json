@@ -1,6 +1,6 @@
 {
   "name": "@matt.kantor/parsing",
-  "version": "2.0.0-1",
+  "version": "2.0.0",
   "dependencies": {
     "@matt.kantor/either": "^1.0.0"
   },
