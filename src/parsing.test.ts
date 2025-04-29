@@ -232,7 +232,7 @@ const assertSuccess = <Output>(
   actualResult: ParserResult<Output>,
   expectedOutput: Output,
 ) =>
-  customAssertions(assertRight, () => {
+  customAssertions(assertSuccess, () => {
     if (either.isLeft(actualResult)) {
       assert.fail('result was failure; expected success')
     }
@@ -242,7 +242,7 @@ const assertSuccess = <Output>(
 const assertFailure = <Output>(
   actualResult: Either<InvalidInputError, Output>,
 ) =>
-  customAssertions(assertRight, () =>
+  customAssertions(assertFailure, () =>
     assert(
       either.isLeft(actualResult),
       'result was successful; expected failure',
