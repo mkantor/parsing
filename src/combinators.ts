@@ -1,8 +1,7 @@
-import type { Either, Right } from '@matt.kantor/either'
+import type { Right } from '@matt.kantor/either'
 import * as either from '@matt.kantor/either'
 import { nothing } from './constructors.js'
 import type {
-  InvalidInputError,
   Parser,
   ParserResult,
   ParserWhichAlwaysSucceeds,
@@ -185,21 +184,6 @@ export const sequence =
   }
 type SequenceOutput<Parsers extends readonly Parser<unknown>[]> = {
   [Index in keyof Parsers]: OutputOf<Parsers[Index]>
-}
-
-/**
- * Refine/transform the output of `parser` via a function which may fail.
- */
-export const transformOutput = <Output, NewOutput>(
-  parser: Parser<Output>,
-  f: (output: Output) => Either<InvalidInputError, NewOutput>,
-): Parser<NewOutput> => {
-  const transformation = (success: Success<Output>) =>
-    either.map(f(success.output), output => ({
-      output,
-      remainingInput: success.remainingInput,
-    }))
-  return input => either.flatMap(parser(input), transformation)
 }
 
 /**
