@@ -18,7 +18,7 @@
     "clean": "rm -rf dist* *.tsbuildinfo",
     "build": "tsc --build tsconfig.lib.json",
     "build:tests": "tsc --project tsconfig.lib.json --outDir dist-test --declarationDir dist && tsc --build tsconfig.test.json",
-    "test": "npm run build:tests && node --test"
+    "test": "npm run build:tests && node --test --no-experimental-strip-types"
   },
   "type": "module"
 }
