@@ -1,6 +1,4 @@
-import type { Right } from '@matt.kantor/either'
 import * as either from '@matt.kantor/either'
-import { nothing } from './constructors.js'
 import type {
   Parser,
   ParserResult,
@@ -190,39 +188,24 @@ type SequenceOutput<Parsers extends readonly Parser<unknown>[]> = {
  * Repeatedly apply `parser` to the input as long as it keeps succeeding.
  * Outputs are collected in an array.
  */
-export const zeroOrMore = <Output>(
-  parser: Parser<Output>,
-): ParserWhichAlwaysSucceeds<readonly Output[]> => {
-  const parserOrNothing = oneOf([parser, nothing])
+export const zeroOrMore =
+  <Output>(
+    parser: Parser<Output>,
+  ): ParserWhichAlwaysSucceeds<readonly Output[]> =>
+  // Uses a loop rather than recursion to avoid stack overflow.
+  input => {
+    const output: Output[] = []
+    const mutableState = { output, remainingInput: input }
 
-  // Give this a name so it can be recursively referenced.
-  const thisParser = (input: string): Right<Success<readonly Output[]>> => {
-    const result = parserOrNothing(input)
-    const success = either.match(result, {
-      left: _ => ({
-        output: [],
-        remainingInput: input,
-      }),
-      right: lastSuccess => {
-        if (lastSuccess.output === undefined) {
-          return {
-            output: [],
-            remainingInput: lastSuccess.remainingInput,
-          }
-        } else {
-          const nextResult = thisParser(lastSuccess.remainingInput)
-          return {
-            output: [lastSuccess.output, ...nextResult.value.output],
-            remainingInput: nextResult.value.remainingInput,
-          }
-        }
-      },
-    })
-    return either.makeRight(success)
+    let result = parser(mutableState.remainingInput)
+    while (either.isRight(result)) {
+      mutableState.output.push(result.value.output)
+      mutableState.remainingInput = result.value.remainingInput
+      result = parser(mutableState.remainingInput)
+    }
+
+    return either.makeRight(mutableState)
   }
-
-  return thisParser
-}
 
 type OutputOf<SpecificParser extends Parser<unknown>> = Extract<
   ReturnType<SpecificParser>['value'],
