@@ -121,6 +121,10 @@ suite('combinators', _ => {
     assertSuccess(oneOrMoreA('aaab'), ['a', 'a', 'a'])
     assertFailure(oneOrMoreA(''))
     assertFailure(oneOrMoreA('b'))
+    assertSuccess(
+      oneOrMore(longInputElementParser)(longInput),
+      longExpectedOutput,
+    )
   })
 
   test('sequence', _ => {
@@ -128,6 +132,18 @@ suite('combinators', _ => {
     assertSuccess(ab('ab'), ['a', 'b'])
     assertSuccess(ab('abc'), ['a', 'b'])
     assertFailure(ab('bab'))
+    assertSuccess(
+      sequence([
+        // Prove there are at least two parsers.
+        longInputElementParser,
+        longInputElementParser,
+        ...Array.from(
+          { length: longInputLength - 2 },
+          _ => longInputElementParser,
+        ),
+      ])(longInput),
+      longExpectedOutput,
+    )
   })
 
   test('zeroOrMore', _ => {
@@ -136,6 +152,10 @@ suite('combinators', _ => {
     assertSuccess(zeroOrMoreA('aaab'), ['a', 'a', 'a'])
     assertSuccess(zeroOrMoreA(''), [])
     assertSuccess(zeroOrMoreA('b'), [])
+    assertSuccess(
+      zeroOrMore(longInputElementParser)(longInput),
+      longExpectedOutput,
+    )
   })
 })
 
@@ -189,6 +209,15 @@ test('README example', _ => {
 
   assertRight(evaluate('2+2-1'), 3)
 })
+
+const longInputLength = 10000
+const longInput = 'a'.repeat(longInputLength)
+const longInputElementParser = literal('a')
+// Written oddly to prove non-emptiness.
+const longExpectedOutput = [
+  'a',
+  ...Array.from({ length: longInputLength - 1 }, _ => 'a' as const),
+] as const
 
 const adjustStartStackFn = (
   error: AssertionError,
