@@ -146,7 +146,7 @@ type OneOfOutput<Parsers extends readonly Parser<unknown>[]> = {
  */
 export const oneOrMore = <Output>(
   parser: Parser<Output>,
-): Parser<readonly [Output, ...(readonly Output[])]> =>
+): Parser<[Output, ...(readonly Output[])]> =>
   map(sequence([parser, zeroOrMore(parser)]), ([head, tail]) => [head, ...tail])
 
 /**
@@ -181,7 +181,7 @@ export const sequence =
     return parseResult as ParserResult<SequenceOutput<Parsers>>
   }
 type SequenceOutput<Parsers extends readonly Parser<unknown>[]> = {
-  [Index in keyof Parsers]: OutputOf<Parsers[Index]>
+  -readonly [Index in keyof Parsers]: OutputOf<Parsers[Index]>
 }
 
 /**
@@ -189,9 +189,7 @@ type SequenceOutput<Parsers extends readonly Parser<unknown>[]> = {
  * Outputs are collected in an array.
  */
 export const zeroOrMore =
-  <Output>(
-    parser: Parser<Output>,
-  ): ParserWhichAlwaysSucceeds<readonly Output[]> =>
+  <Output>(parser: Parser<Output>): ParserWhichAlwaysSucceeds<Output[]> =>
   // Uses a loop rather than recursion to avoid stack overflow.
   input => {
     const output: Output[] = []

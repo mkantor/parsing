@@ -213,11 +213,10 @@ test('README example', _ => {
 const longInputLength = 10000
 const longInput = 'a'.repeat(longInputLength)
 const longInputElementParser = literal('a')
-// Written oddly to prove non-emptiness.
-const longExpectedOutput = [
-  'a',
-  ...Array.from({ length: longInputLength - 1 }, _ => 'a' as const),
-] as const
+const longExpectedOutput = Array.from(
+  { length: longInputLength },
+  _ => 'a' as const,
+)
 
 const adjustStartStackFn = (
   error: AssertionError,
