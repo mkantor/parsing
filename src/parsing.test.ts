@@ -200,14 +200,7 @@ test('README example', _ => {
 
   const expression: Parser<number> = oneOf([compoundExpression, number])
 
-  const evaluate = (input: string) =>
-    either.flatMap(expression(input), ({ remainingInput, output }) =>
-      remainingInput.length !== 0
-        ? either.makeLeft('excess content followed valid input')
-        : either.makeRight(output),
-    )
-
-  assertRight(evaluate('2+2-1'), 3)
+  assertRight(parse(expression, '2+2-1'), 3)
 })
 
 const longInputLength = 10000

@@ -49,12 +49,5 @@ const compoundExpression = map(
 
 const expression: Parser<number> = oneOf([compoundExpression, number])
 
-const evaluate = (input: string) =>
-  either.flatMap(expression(input), ({ remainingInput, output }) =>
-    remainingInput.length !== 0
-      ? either.makeLeft('excess content followed valid input')
-      : either.makeRight(output),
-  )
-
-console.log(evaluate('2+2-1').value) // logs "3"
+console.log(parse(expression, '2+2-1').value) // logs "3"
 ```
