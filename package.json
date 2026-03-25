@@ -13,7 +13,10 @@
   ],
   "license": "MIT",
   "main": "dist/index.js",
-  "repository": "github:mkantor/parsing",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mkantor/parsing.git"
+  },
   "scripts": {
     "clean": "rm -rf dist* *.tsbuildinfo",
     "build": "tsc --build tsconfig.lib.json",
