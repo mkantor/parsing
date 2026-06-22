@@ -165,6 +165,58 @@ test('parse', _ => {
   assertFailure(parse(literal('a'), 'ab'))
 })
 
+suite('failure offsets', _ => {
+  test('failures carry an offset and expectation', _ => {
+    assertFailureWithDetails(literal('a')('b'), {
+      expected: ['"a"'],
+      offset: 0n,
+    })
+    assertSuccess(literal('a')('xa', 1n), 'a')
+    assertFailureWithDetails(literal('a')('xb', 1n), {
+      offset: 1n,
+    })
+  })
+
+  test('sequence reports the offset of the element that failed', _ => {
+    const ab = sequence([literal('a'), literal('b')])
+    assertFailureWithDetails(ab('ax'), {
+      expected: ['"b"'],
+      offset: 1n,
+    })
+  })
+
+  test('oneOf reports the furthest alternative and merges ties', _ => {
+    // Both alternatives consume 'a' before failing at offset 1.
+    const ab = sequence([literal('a'), literal('b')])
+    const ac = sequence([literal('a'), literal('c')])
+    const result = oneOf([ab, ac])('axd')
+    assertFailureWithDetails(result, {
+      expected: ['"b"', '"c"'],
+      message: 'expected one of: "b", "c"',
+      offset: 1n,
+    })
+  })
+
+  test('a nested oneOf inside a sequence merges expectations', _ => {
+    const parser = sequence([literal('a'), oneOf([literal('b'), literal('c')])])
+    const result = parser('ax')
+    assertFailureWithDetails(result, {
+      expected: ['"b"', '"c"'],
+      message: 'expected one of: "b", "c"',
+      offset: 1n,
+    })
+  })
+
+  test('parse reports leaf and excess-content offsets', _ => {
+    assertFailureWithDetails(parse(literal('a'), 'b'), { offset: 0n })
+    const excess = parse(literal('a'), 'ab')
+    assertFailureWithDetails(excess, {
+      message: 'excess content followed valid input',
+      offset: 1n,
+    })
+  })
+})
+
 test('README example', _ => {
   const operator = oneOf([literal('+'), literal('-')])
 
@@ -268,4 +320,15 @@ const assertFailure = <Output>(
       either.isLeft(actualResult),
       'result was successful; expected failure',
     ),
+  )
+
+const assertFailureWithDetails = (
+  actualResult: Either<InvalidInputError, unknown>,
+  expectedDetails: Partial<InvalidInputError>,
+) =>
+  customAssertions(assertFailureWithDetails, () =>
+    either.match(actualResult, {
+      left: error => assert.partialDeepStrictEqual(error, expectedDetails),
+      right: _ => assert.fail('result was successful; expected failure'),
+    }),
   )
