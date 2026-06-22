@@ -13,6 +13,7 @@ import {
   map,
   oneOf,
   oneOrMore,
+  parse,
   sequence,
   type Parser,
 } from '@matt.kantor/parsing'
