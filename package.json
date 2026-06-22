@@ -2,7 +2,7 @@
   "name": "@matt.kantor/parsing",
   "version": "2.1.0",
   "dependencies": {
-    "@matt.kantor/either": "^1.0.0"
+    "@matt.kantor/either": "^1.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.14",
