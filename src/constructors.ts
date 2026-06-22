@@ -1,56 +1,71 @@
 import * as either from '@matt.kantor/either'
 import type { Parser, ParserWhichAlwaysSucceeds } from './parser.js'
 
-export const anySingleCharacter: Parser<string> = input => {
-  const firstCodePoint = input.codePointAt(0)
+export const anySingleCharacter: Parser<string> = (input, offset = 0n) => {
+  const firstCodePoint = input.codePointAt(Number(offset))
   if (firstCodePoint === undefined) {
     return either.makeLeft({
-      input,
-      message: 'input was empty',
+      source: input,
+      offset,
+      message: 'unexpected end of input',
+      expected: ['any character'],
     })
   } else {
     const firstCharacter = String.fromCodePoint(firstCodePoint)
     return either.makeRight({
       output: firstCharacter,
-      remainingInput: input.slice(firstCharacter.length),
+      offset: offset + BigInt(firstCharacter.length),
     })
   }
 }
 
 export const literal = <Text extends string>(text: Text): Parser<Text> => {
   const errorMessage = `input did not begin with "${text}"`
-  return input =>
-    input.startsWith(text)
+  const expected = [`"${text}"`]
+  return (input, offset = 0n) =>
+    input.startsWith(text, Number(offset))
       ? either.makeRight({
-          remainingInput: input.slice(text.length),
           output: text,
+          offset: offset + BigInt(text.length),
         })
       : either.makeLeft({
-          input,
+          source: input,
+          offset,
           message: errorMessage,
+          expected,
         })
 }
 
-export const nothing: ParserWhichAlwaysSucceeds<undefined> = input =>
+export const nothing: ParserWhichAlwaysSucceeds<undefined> = (
+  _input,
+  offset = 0n,
+) =>
   either.makeRight({
-    remainingInput: input,
     output: undefined,
+    offset,
   })
 
 export const regularExpression = (pattern: RegExp): Parser<string> => {
-  const patternAnchoredToStartOfString = pattern.source.startsWith('^')
-    ? pattern
-    : new RegExp(`^${pattern.source}`, pattern.flags)
-  return input => {
-    const match = patternAnchoredToStartOfString.exec(input)
+  // Match from the `offset` by enabling the sticky (`y`) flag and setting
+  // `lastIndex` to `offset`.
+  const stickyPattern = new RegExp(
+    pattern.source,
+    pattern.flags.includes('y') ? pattern.flags : `${pattern.flags}y`,
+  )
+  const expected = [`/${pattern.source}/`]
+  return (input, offset = 0n) => {
+    stickyPattern.lastIndex = Number(offset)
+    const match = stickyPattern.exec(input)
     return match === null
       ? either.makeLeft({
-          input,
+          source: input,
+          offset,
           message: 'input did not match regular expression',
+          expected,
         })
       : either.makeRight({
-          remainingInput: input.slice(match[0].length),
           output: match[0],
+          offset: offset + BigInt(match[0].length),
         })
   }
 }

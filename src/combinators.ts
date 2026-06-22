@@ -1,5 +1,6 @@
 import * as either from '@matt.kantor/either'
 import type {
+  InvalidInputError,
   Parser,
   ParserResult,
   ParserWhichAlwaysSucceeds,
@@ -15,9 +16,10 @@ export const as = <NewOutput>(
 ): Parser<NewOutput> => {
   const replaceOutput = (success: Success<unknown>) => ({
     output: newOutput,
-    remainingInput: success.remainingInput,
+    offset: success.offset,
   })
-  return input => either.map(parser(input), replaceOutput)
+  return (input, offset = 0n) =>
+    either.map(parser(input, offset), replaceOutput)
 }
 
 /**
@@ -35,13 +37,15 @@ export const butNot = <Output>(
   notName: string,
 ): Parser<Output> => {
   const errorMessage = `input was unexpectedly ${notName}`
-  return input =>
-    either.flatMap(parser(input), success => {
-      const notResult = not(input)
+  return (input, offset = 0n) =>
+    either.flatMap(parser(input, offset), success => {
+      const notResult = not(input, offset)
       if (!either.isLeft(notResult)) {
         return either.makeLeft({
-          input,
+          source: input,
+          offset,
           message: errorMessage,
+          expected: [`not ${notName}`],
         })
       } else {
         return either.makeRight(success)
@@ -53,24 +57,23 @@ export const butNot = <Output>(
  * Map the output of `parser` to another `Parser` which is then applied to the
  * remaining input, returning the result of the second parser upon success.
  */
-export const flatMap = <Output, NewOutput>(
-  parser: Parser<Output>,
-  f: (output: Output) => Parser<NewOutput>,
-): Parser<NewOutput> => {
-  const applyF = (success: Success<Output>) => {
-    const nextParser = f(success.output)
-    return nextParser(success.remainingInput)
-  }
-  return input => either.flatMap(parser(input), applyF)
-}
+export const flatMap =
+  <Output, NewOutput>(
+    parser: Parser<Output>,
+    f: (output: Output) => Parser<NewOutput>,
+  ): Parser<NewOutput> =>
+  (input, offset = 0n) =>
+    either.flatMap(parser(input, offset), success =>
+      f(success.output)(input, success.offset),
+    )
 
 /**
  * Create a `Parser` from a thunk. This can be useful for recursive parsers.
  */
 export const lazy =
   <Output>(parser: () => Parser<Output>): Parser<Output> =>
-  input =>
-    parser()(input)
+  (input, offset = 0n) =>
+    parser()(input, offset)
 
 /**
  * Attempt to parse input with `parser`. If successful, ensure the remaining
@@ -87,14 +90,16 @@ export const lookaheadNot = <Output>(
   followedByName: string,
 ): Parser<Output> => {
   const errorMessage = `input was unexpectedly followed by ${followedByName}`
-  return input =>
-    either.flatMap(parser(input), success =>
-      either.match(notFollowedBy(success.remainingInput), {
+  return (input, offset = 0n) =>
+    either.flatMap(parser(input, offset), success =>
+      either.match(notFollowedBy(input, success.offset), {
         left: _ => either.makeRight(success),
         right: _ =>
           either.makeLeft({
-            input,
+            source: input,
+            offset: success.offset,
             message: errorMessage,
+            expected: [`not followed by ${followedByName}`],
           }),
       }),
     )
@@ -109,13 +114,15 @@ export const map = <Output, NewOutput>(
 ): Parser<NewOutput> => {
   const applyF = (success: Success<Output>) => ({
     output: f(success.output),
-    remainingInput: success.remainingInput,
+    offset: success.offset,
   })
-  return input => either.map(parser(input), applyF)
+  return (input, offset = 0n) => either.map(parser(input, offset), applyF)
 }
 
 /**
  * Apply the given `parsers` to the same input until one succeeds or all fail.
+ * When all fail, the failure which reached the furthest offset is returned; if
+ * several reached the same furthest offset their expectations are merged.
  */
 export const oneOf = <
   Parsers extends readonly [
@@ -127,11 +134,17 @@ export const oneOf = <
   parsers: Parsers,
 ): Parser<OneOfOutput<Parsers>> => {
   const [firstParser, ...otherParsers] = parsers
-  return input => {
-    const firstResult = firstParser(input)
+  return (input, offset = 0n) => {
+    const firstResult = firstParser(input, offset)
     return otherParsers.reduce(
       (result: ReturnType<Parser<OneOfOutput<Parsers>>>, parser) =>
-        either.isLeft(result) ? parser(input) : result,
+        either.match(result, {
+          left: previousFailure =>
+            either.mapLeft(parser(input, offset), nextFailure =>
+              furthestFailure(previousFailure, nextFailure),
+            ),
+          right: _ => result,
+        }),
       firstResult,
     )
   }
@@ -162,19 +175,19 @@ export const sequence =
   >(
     parsers: Parsers,
   ): Parser<SequenceOutput<Parsers>> =>
-  input => {
+  (input, offset = 0n) => {
     const parseResult = parsers.reduce(
       (
         results: ReturnType<Parser<readonly SequenceOutput<Parsers>[number][]>>,
         parser,
       ) =>
         either.isRight(results)
-          ? either.map(parser(results.value.remainingInput), newSuccess => ({
-              remainingInput: newSuccess.remainingInput,
+          ? either.map(parser(input, results.value.offset), newSuccess => ({
+              offset: newSuccess.offset,
               output: [...results.value.output, newSuccess.output],
             }))
           : results,
-      either.makeRight({ remainingInput: input, output: [] }), // `parsers` is non-empty so this is never returned
+      either.makeRight({ offset, output: [] }), // `parsers` is non-empty so this is never returned
     )
     // The above `reduce` callback constructs `output` such that its
     // elements align with `Parsers`, but TypeScript doesn't know that.
@@ -191,19 +204,45 @@ type SequenceOutput<Parsers extends readonly Parser<unknown>[]> = {
 export const zeroOrMore =
   <Output>(parser: Parser<Output>): ParserWhichAlwaysSucceeds<Output[]> =>
   // Uses a loop rather than recursion to avoid stack overflow.
-  input => {
+  (input, offset = 0n) => {
     const output: Output[] = []
-    const mutableState = { output, remainingInput: input }
+    const mutableState = { output, offset }
 
-    let result = parser(mutableState.remainingInput)
+    let result = parser(input, mutableState.offset)
     while (either.isRight(result)) {
       mutableState.output.push(result.value.output)
-      mutableState.remainingInput = result.value.remainingInput
-      result = parser(mutableState.remainingInput)
+      mutableState.offset = result.value.offset
+      result = parser(input, mutableState.offset)
     }
 
     return either.makeRight(mutableState)
   }
+
+// Of two failures, keep whichever reached the furthest offset; on a tie, merge
+// their expectations into a single failure.
+const furthestFailure = (
+  previousFailure: InvalidInputError,
+  nextFailure: InvalidInputError,
+): InvalidInputError => {
+  if (nextFailure.offset > previousFailure.offset) {
+    return nextFailure
+  } else if (previousFailure.offset > nextFailure.offset) {
+    return previousFailure
+  } else {
+    const expected = [
+      ...new Set([...previousFailure.expected, ...nextFailure.expected]),
+    ]
+    return {
+      source: previousFailure.source,
+      offset: previousFailure.offset,
+      expected,
+      message:
+        expected.length > 1
+          ? `expected one of: ${expected.join(', ')}`
+          : `expected ${expected[0]}`,
+    }
+  }
+}
 
 type OutputOf<SpecificParser extends Parser<unknown>> = Extract<
   ReturnType<SpecificParser>['value'],
