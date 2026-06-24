@@ -20,8 +20,8 @@ export const anySingleCharacter: Parser<string> = (input, offset = 0n) => {
 }
 
 export const literal = <Text extends string>(text: Text): Parser<Text> => {
-  const errorMessage = `input did not begin with "${text}"`
-  const expected = [`"${text}"`]
+  const errorMessage = `input did not begin with \`${text}\``
+  const expected = [`\`${text}\``]
   return (input, offset = 0n) =>
     input.startsWith(text, Number(offset))
       ? either.makeRight({
