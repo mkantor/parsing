@@ -1,6 +1,5 @@
 import * as either from '@matt.kantor/either'
 import type {
-  InvalidInputError,
   Parser,
   ParserResult,
   ParserWhichAlwaysSucceeds,
@@ -121,34 +120,55 @@ export const map = <Output, NewOutput>(
 
 /**
  * Apply the given `parsers` to the same input until one succeeds or all fail.
- * When all fail, the failure which reached the furthest offset is returned; if
+ * When all fail, the error which reached the furthest offset is returned; if
  * several reached the same furthest offset their expectations are merged.
  */
-export const oneOf = <
-  Parsers extends readonly [
-    Parser<unknown>,
-    Parser<unknown>,
-    ...(readonly Parser<unknown>[]),
-  ],
->(
-  parsers: Parsers,
-): Parser<OneOfOutput<Parsers>> => {
-  const [firstParser, ...otherParsers] = parsers
-  return (input, offset = 0n) => {
-    const firstResult = firstParser(input, offset)
-    return otherParsers.reduce(
-      (result: ReturnType<Parser<OneOfOutput<Parsers>>>, parser) =>
-        either.match(result, {
-          left: previousFailure =>
-            either.mapLeft(parser(input, offset), nextFailure =>
-              furthestFailure(previousFailure, nextFailure),
-            ),
-          right: _ => result,
-        }),
-      firstResult,
-    )
+export const oneOf =
+  <
+    Parsers extends readonly [
+      Parser<unknown>,
+      Parser<unknown>,
+      ...(readonly Parser<unknown>[]),
+    ],
+  >(
+    parsers: Parsers,
+  ): Parser<OneOfOutput<Parsers>> =>
+  (input, offset = 0n) => {
+    // To avoid copies (for performance reasons), local mutable state + an
+    // imperative loop is used rather than simply reducing `parsers`.
+    const mutableFurthestExpectations: string[] = []
+    let mutableFurthestOffset = -1n
+    for (const parser of parsers) {
+      const result = parser(input, offset)
+      if (either.isLeft(result)) {
+        const error = result.value
+        if (error.offset > mutableFurthestOffset) {
+          mutableFurthestOffset = error.offset
+          mutableFurthestExpectations.length = 0
+          mutableFurthestExpectations.push(...error.expected)
+        } else if (error.offset === mutableFurthestOffset) {
+          mutableFurthestExpectations.push(...error.expected)
+        }
+      } else {
+        // Success!
+        return result
+      }
+    }
+
+    // TODO: Consider changing `InvalidInputError['expected']` to be a `Set`.
+    const expected = [...new Set(mutableFurthestExpectations)]
+
+    // If we haven't already returned then parsing failed.
+    return either.makeLeft({
+      source: input,
+      offset: mutableFurthestOffset,
+      expected: expected,
+      message:
+        expected.length > 1
+          ? `expected one of: ${expected.join(', ')}`
+          : `expected ${expected[0]}`,
+    })
   }
-}
 type OneOfOutput<Parsers extends readonly Parser<unknown>[]> = {
   [Index in keyof Parsers]: OutputOf<Parsers[Index]>
 }[number]
@@ -217,32 +237,6 @@ export const zeroOrMore =
 
     return either.makeRight(mutableState)
   }
-
-// Of two failures, keep whichever reached the furthest offset; on a tie, merge
-// their expectations into a single failure.
-const furthestFailure = (
-  previousFailure: InvalidInputError,
-  nextFailure: InvalidInputError,
-): InvalidInputError => {
-  if (nextFailure.offset > previousFailure.offset) {
-    return nextFailure
-  } else if (previousFailure.offset > nextFailure.offset) {
-    return previousFailure
-  } else {
-    const expected = [
-      ...new Set([...previousFailure.expected, ...nextFailure.expected]),
-    ]
-    return {
-      source: previousFailure.source,
-      offset: previousFailure.offset,
-      expected,
-      message:
-        expected.length > 1
-          ? `expected one of: ${expected.join(', ')}`
-          : `expected ${expected[0]}`,
-    }
-  }
-}
 
 type OutputOf<SpecificParser extends Parser<unknown>> = Extract<
   ReturnType<SpecificParser>['value'],
