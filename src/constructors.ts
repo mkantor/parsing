@@ -8,7 +8,7 @@ export const anySingleCharacter: Parser<string> = (input, offset = 0n) => {
       source: input,
       offset,
       message: 'unexpected end of input',
-      expected: ['any character'],
+      expected: new Set(['any character']),
     })
   } else {
     const firstCharacter = String.fromCodePoint(firstCodePoint)
@@ -21,7 +21,7 @@ export const anySingleCharacter: Parser<string> = (input, offset = 0n) => {
 
 export const literal = <Text extends string>(text: Text): Parser<Text> => {
   const errorMessage = `input did not begin with \`${text}\``
-  const expected = [`\`${text}\``]
+  const expected = new Set([`\`${text}\``])
   return (input, offset = 0n) =>
     input.startsWith(text, Number(offset))
       ? either.makeRight({
@@ -52,7 +52,7 @@ export const regularExpression = (pattern: RegExp): Parser<string> => {
     pattern.source,
     pattern.flags.includes('y') ? pattern.flags : `${pattern.flags}y`,
   )
-  const expected = [`/${pattern.source}/`]
+  const expected = new Set([`/${pattern.source}/`])
   return (input, offset = 0n) => {
     stickyPattern.lastIndex = Number(offset)
     const match = stickyPattern.exec(input)
