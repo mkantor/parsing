@@ -5,6 +5,7 @@ import {
   as,
   butNot,
   flatMap,
+  hidden,
   lazy,
   lookaheadNot,
   map,
@@ -291,6 +292,17 @@ suite('furthest failures survive backtracking', _ => {
     assertFailureWithDetails(oneOf([alwaysFailsWithNote, literal('z')])('x'), {
       expected: new Set(['something else', '`z`']),
       notes: [note],
+      offset: 0n,
+    })
+  })
+})
+
+suite('hidden', _ => {
+  test('contributes no expectations when something else failed', _ => {
+    const result = oneOf([hidden(literal('a')), literal('b')])('x')
+    assertFailureWithDetails(result, {
+      expected: new Set(['`b`']),
+      message: 'expected `b`',
       offset: 0n,
     })
   })
