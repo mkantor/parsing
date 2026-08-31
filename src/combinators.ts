@@ -1,5 +1,6 @@
 import * as either from '@matt.kantor/either'
 import type {
+  Note,
   Parser,
   ParserResult,
   ParserWhichAlwaysSucceeds,
@@ -46,6 +47,7 @@ export const butNot = <Output>(
           offset,
           message: errorMessage,
           expected,
+          notes: [],
         })
       } else {
         return either.makeRight(success)
@@ -101,6 +103,7 @@ export const lookaheadNot = <Output>(
             offset: success.offset,
             message: errorMessage,
             expected,
+            notes: [],
           }),
       }),
     )
@@ -139,6 +142,7 @@ export const oneOf =
     // To avoid copies (for performance reasons), local mutable state + an
     // imperative loop is used rather than simply reducing `parsers`.
     const mutableFurthestExpectations: string[] = []
+    const mutableFurthestNotes: Note[] = []
     let mutableFurthestOffset = -1n
     for (const parser of parsers) {
       const result = parser(input, offset)
@@ -147,9 +151,12 @@ export const oneOf =
         if (error.offset > mutableFurthestOffset) {
           mutableFurthestOffset = error.offset
           mutableFurthestExpectations.length = 0
+          mutableFurthestNotes.length = 0
           mutableFurthestExpectations.push(...error.expected)
+          mutableFurthestNotes.push(...error.notes)
         } else if (error.offset === mutableFurthestOffset) {
           mutableFurthestExpectations.push(...error.expected)
+          mutableFurthestNotes.push(...error.notes)
         }
       } else {
         // Success!
@@ -167,12 +174,23 @@ export const oneOf =
           ? `expected ${onlyExpectation}`
           : `expected one of: ${[...expected].join(', ')}`
 
+    // Deduplicate notes.
+    const notes = mutableFurthestNotes.filter(
+      (note, index) =>
+        mutableFurthestNotes.findIndex(
+          otherNote =>
+            otherNote.offset === note.offset &&
+            otherNote.message === note.message,
+        ) === index,
+    )
+
     // If we haven't already returned then parsing failed.
     return either.makeLeft({
       source: input,
       offset: mutableFurthestOffset,
       message,
       expected,
+      notes,
     })
   }
 type OneOfOutput<Parsers extends readonly Parser<unknown>[]> = {

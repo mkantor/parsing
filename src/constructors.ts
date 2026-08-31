@@ -9,6 +9,7 @@ export const anySingleCharacter: Parser<string> = (input, offset = 0n) => {
       offset,
       message: 'unexpected end of input',
       expected: new Set(['any character']),
+      notes: [],
     })
   } else {
     const firstCharacter = String.fromCodePoint(firstCodePoint)
@@ -33,6 +34,7 @@ export const literal = <Text extends string>(text: Text): Parser<Text> => {
           offset,
           message: errorMessage,
           expected,
+          notes: [],
         })
 }
 
@@ -62,6 +64,7 @@ export const regularExpression = (pattern: RegExp): Parser<string> => {
           offset,
           message: 'input did not match regular expression',
           expected,
+          notes: [],
         })
       : either.makeRight({
           output: match[0],
