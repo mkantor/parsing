@@ -85,6 +85,19 @@ export const flatMap =
     )
 
 /**
+ * Change the parser's description in error messages.
+ *
+ * @example
+ * ```ts
+ * labeled(oneOf([number, parenthesizedExpression]), 'an expression')
+ * ```
+ */
+export const labeled = <Output>(
+  parser: Parser<Output>,
+  label: string,
+): Parser<Output> => withExpectations(parser, new Set([label]))
+
+/**
  * Omit `parser`'s expected values from errors.
  *
  * Intended for parsers whose absence is unsurprising, e.g. in many languages
