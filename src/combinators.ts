@@ -36,6 +36,7 @@ export const butNot = <Output>(
   notName: string,
 ): Parser<Output> => {
   const errorMessage = `input was unexpectedly ${notName}`
+  const expected = new Set([`not ${notName}`])
   return (input, offset = 0n) =>
     either.flatMap(parser(input, offset), success => {
       const notResult = not(input, offset)
@@ -44,7 +45,7 @@ export const butNot = <Output>(
           source: input,
           offset,
           message: errorMessage,
-          expected: [`not ${notName}`],
+          expected,
         })
       } else {
         return either.makeRight(success)
@@ -89,6 +90,7 @@ export const lookaheadNot = <Output>(
   followedByName: string,
 ): Parser<Output> => {
   const errorMessage = `input was unexpectedly followed by ${followedByName}`
+  const expected = new Set([`not followed by ${followedByName}`])
   return (input, offset = 0n) =>
     either.flatMap(parser(input, offset), success =>
       either.match(notFollowedBy(input, success.offset), {
@@ -98,7 +100,7 @@ export const lookaheadNot = <Output>(
             source: input,
             offset: success.offset,
             message: errorMessage,
-            expected: [`not followed by ${followedByName}`],
+            expected,
           }),
       }),
     )
@@ -155,18 +157,22 @@ export const oneOf =
       }
     }
 
-    // TODO: Consider changing `InvalidInputError['expected']` to be a `Set`.
-    const expected = [...new Set(mutableFurthestExpectations)]
+    const expected = new Set(mutableFurthestExpectations)
+
+    const [onlyExpectation, ...otherExpectations] = expected
+    const message =
+      onlyExpectation === undefined
+        ? 'unexpected input'
+        : otherExpectations.length === 0
+          ? `expected ${onlyExpectation}`
+          : `expected one of: ${[...expected].join(', ')}`
 
     // If we haven't already returned then parsing failed.
     return either.makeLeft({
       source: input,
       offset: mutableFurthestOffset,
-      expected: expected,
-      message:
-        expected.length > 1
-          ? `expected one of: ${expected.join(', ')}`
-          : `expected ${expected[0]}`,
+      message,
+      expected,
     })
   }
 type OneOfOutput<Parsers extends readonly Parser<unknown>[]> = {

@@ -168,7 +168,7 @@ test('parse', _ => {
 suite('failure offsets', _ => {
   test('failures carry an offset and expectation', _ => {
     assertFailureWithDetails(literal('a')('b'), {
-      expected: ['`a`'],
+      expected: new Set(['`a`']),
       offset: 0n,
     })
     assertSuccess(literal('a')('xa', 1n), 'a')
@@ -180,7 +180,7 @@ suite('failure offsets', _ => {
   test('sequence reports the offset of the element that failed', _ => {
     const ab = sequence([literal('a'), literal('b')])
     assertFailureWithDetails(ab('ax'), {
-      expected: ['`b`'],
+      expected: new Set(['`b`']),
       offset: 1n,
     })
   })
@@ -191,7 +191,7 @@ suite('failure offsets', _ => {
     const ac = sequence([literal('a'), literal('c')])
     const result = oneOf([ab, ac])('axd')
     assertFailureWithDetails(result, {
-      expected: ['`b`', '`c`'],
+      expected: new Set(['`b`', '`c`']),
       message: 'expected one of: `b`, `c`',
       offset: 1n,
     })
@@ -201,7 +201,7 @@ suite('failure offsets', _ => {
     const parser = sequence([literal('a'), oneOf([literal('b'), literal('c')])])
     const result = parser('ax')
     assertFailureWithDetails(result, {
-      expected: ['`b`', '`c`'],
+      expected: new Set(['`b`', '`c`']),
       message: 'expected one of: `b`, `c`',
       offset: 1n,
     })

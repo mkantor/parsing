@@ -5,7 +5,7 @@ export type InvalidInputError = {
   readonly source: string
   readonly offset: bigint
   readonly message: string
-  readonly expected: readonly string[]
+  readonly expected: ReadonlySet<string>
 }
 
 export type Parser<Output> = (
@@ -42,7 +42,7 @@ export const parse = <Output>(
           source: input,
           offset,
           message: 'excess content followed valid input',
-          expected: ['end of input'],
+          expected: new Set(['end of input']),
         })
       : either.makeRight(output),
   )
