@@ -217,7 +217,67 @@ suite('failure offsets', _ => {
   })
 })
 
-suite('notes', _ => {
+suite('furthest failures survive backtracking', _ => {
+  test('a shorter alternative succeeding does not erase a deeper failure', _ => {
+    const result = oneOf([
+      sequence([literal('a'), literal('b'), literal('c')]),
+      literal('a'),
+    ])('abx')
+    assertSuccess(result, 'a')
+    assertFurthestFailure(result, {
+      expected: new Set(['`c`']),
+      offset: 2n,
+    })
+  })
+
+  test('an optional parser still reports where it failed', _ => {
+    const result = oneOf([sequence([literal('a'), literal('b')]), nothing])(
+      'ax',
+    )
+    assertFurthestFailure(result, {
+      expected: new Set(['`b`']),
+      offset: 1n,
+    })
+  })
+
+  test('zeroOrMore keeps the failure which ended the repetition', _ => {
+    // Two `ab`s are consumed, then a third iteration gets as far as 'a'.
+    const result = zeroOrMore(sequence([literal('a'), literal('b')]))('ababa')
+    assertFurthestFailure(result, {
+      expected: new Set(['`b`']),
+      offset: 5n,
+    })
+  })
+
+  test('parse prefers a carried failure', _ => {
+    assertFailureWithDetails(
+      parse(
+        oneOf([
+          sequence([literal('a'), literal('b'), literal('c')]),
+          literal('a'),
+        ]),
+        'abx',
+      ),
+      {
+        expected: new Set(['`c`']),
+        message: 'expected `c`',
+        offset: 2n,
+      },
+    )
+
+    assertFailureWithDetails(
+      parse(
+        oneOf([sequence([literal('a'), literal('b')]), literal('a')]),
+        'ax',
+      ),
+      {
+        expected: new Set(['`b`', 'end of input']),
+        message: 'expected one of: `b`, end of input',
+        offset: 1n,
+      },
+    )
+  })
+
   test('notes travel with failures and merge on ties', _ => {
     const note = { offset: 0n, message: 'opened here' }
     const alwaysFailsWithNote: Parser<never> = (input, offset = 0n) =>
@@ -349,5 +409,22 @@ const assertFailureWithDetails = (
     either.match(actualResult, {
       left: error => assert.partialDeepStrictEqual(error, expectedDetails),
       right: _ => assert.fail('result was successful; expected failure'),
+    }),
+  )
+
+const assertFurthestFailure = (
+  actualResult: ParserResult<unknown>,
+  expectedDetails: Partial<InvalidInputError>,
+) =>
+  customAssertions(assertFurthestFailure, () =>
+    either.match(actualResult, {
+      left: _ => assert.fail('result was failure; expected success'),
+      right: success =>
+        success.furthestFailure === undefined
+          ? assert.fail('success carried no furthest failure')
+          : assert.partialDeepStrictEqual(
+              success.furthestFailure,
+              expectedDetails,
+            ),
     }),
   )

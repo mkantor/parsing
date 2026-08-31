@@ -1,5 +1,6 @@
 import type { Either, Right } from '@matt.kantor/either'
 import * as either from '@matt.kantor/either'
+import { furthest } from './internal.js'
 
 export type InvalidInputError = {
   readonly source: string
@@ -33,6 +34,10 @@ export type ParserResult<Output> = Either<InvalidInputError, Success<Output>>
 export type Success<Output> = {
   readonly offset: bigint
   readonly output: Output
+  /**
+   * The furthest failure encountered while producing this success, if any.
+   */
+  readonly furthestFailure: InvalidInputError | undefined
 }
 
 /**
@@ -46,14 +51,19 @@ export const parse = <Output>(
   parser: Parser<Output>,
   input: string,
 ): Either<InvalidInputError, Output> =>
-  either.flatMap(parser(input, 0n), ({ output, offset }) =>
-    Number(offset) !== input.length
-      ? either.makeLeft({
-          source: input,
-          offset,
-          message: 'excess content followed valid input',
-          expected: new Set(['end of input']),
-          notes: [],
-        })
-      : either.makeRight(output),
-  )
+  either.flatMap(parser(input, 0n), ({ output, offset, furthestFailure }) => {
+    const excessContent: InvalidInputError = {
+      source: input,
+      offset,
+      message: 'excess content followed valid input',
+      expected: new Set(['end of input']),
+      notes: [],
+    }
+    return Number(offset) !== input.length
+      ? either.makeLeft(
+          furthestFailure === undefined
+            ? excessContent
+            : furthest(furthestFailure, excessContent),
+        )
+      : either.makeRight(output)
+  })
