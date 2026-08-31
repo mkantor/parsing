@@ -6,6 +6,16 @@ export type InvalidInputError = {
   readonly offset: bigint
   readonly message: string
   readonly expected: ReadonlySet<string>
+  readonly notes: readonly Note[]
+}
+
+/**
+ * A secondary point in the source which helps explain a failure, such as the
+ * position of an opening delimiter which was never closed.
+ */
+export type Note = {
+  readonly offset: bigint
+  readonly message: string
 }
 
 export type Parser<Output> = (
@@ -43,6 +53,7 @@ export const parse = <Output>(
           offset,
           message: 'excess content followed valid input',
           expected: new Set(['end of input']),
+          notes: [],
         })
       : either.makeRight(output),
   )

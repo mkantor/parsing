@@ -217,6 +217,25 @@ suite('failure offsets', _ => {
   })
 })
 
+suite('notes', _ => {
+  test('notes travel with failures and merge on ties', _ => {
+    const note = { offset: 0n, message: 'opened here' }
+    const alwaysFailsWithNote: Parser<never> = (input, offset = 0n) =>
+      either.makeLeft({
+        source: input,
+        offset,
+        message: 'no good',
+        expected: new Set(['something else']),
+        notes: [note],
+      })
+    assertFailureWithDetails(oneOf([alwaysFailsWithNote, literal('z')])('x'), {
+      expected: new Set(['something else', '`z`']),
+      notes: [note],
+      offset: 0n,
+    })
+  })
+})
+
 test('README example', _ => {
   const operator = oneOf([literal('+'), literal('-')])
 
