@@ -1,11 +1,18 @@
 import * as either from '@matt.kantor/either'
 import type {
+  InvalidInputError,
   Note,
   Parser,
   ParserResult,
   ParserWhichAlwaysSucceeds,
   Success,
 } from './parser.js'
+import {
+  deduplicateNotes,
+  furthest,
+  furthestOrUndefined,
+  messageForExpectations,
+} from './internal.js'
 
 /**
  * Substitute the output of a successful parse.
@@ -17,6 +24,7 @@ export const as = <NewOutput>(
   const replaceOutput = (success: Success<unknown>) => ({
     output: newOutput,
     offset: success.offset,
+    furthestFailure: success.furthestFailure,
   })
   return (input, offset = 0n) =>
     either.map(parser(input, offset), replaceOutput)
@@ -42,13 +50,18 @@ export const butNot = <Output>(
     either.flatMap(parser(input, offset), success => {
       const notResult = not(input, offset)
       if (!either.isLeft(notResult)) {
-        return either.makeLeft({
+        const newError = {
           source: input,
           offset,
           message: errorMessage,
           expected,
           notes: [],
-        })
+        }
+        return either.makeLeft(
+          success.furthestFailure === undefined
+            ? newError
+            : furthest(success.furthestFailure, newError),
+        )
       } else {
         return either.makeRight(success)
       }
@@ -66,7 +79,9 @@ export const flatMap =
   ): Parser<NewOutput> =>
   (input, offset = 0n) =>
     either.flatMap(parser(input, offset), success =>
-      f(success.output)(input, success.offset),
+      withPotentiallyFurtherFailure(success.furthestFailure)(
+        f(success.output)(input, success.offset),
+      ),
     )
 
 /**
@@ -97,14 +112,20 @@ export const lookaheadNot = <Output>(
     either.flatMap(parser(input, offset), success =>
       either.match(notFollowedBy(input, success.offset), {
         left: _ => either.makeRight(success),
-        right: _ =>
-          either.makeLeft({
+        right: _ => {
+          const newError = {
             source: input,
             offset: success.offset,
             message: errorMessage,
             expected,
             notes: [],
-          }),
+          }
+          return either.makeLeft(
+            success.furthestFailure === undefined
+              ? newError
+              : furthest(success.furthestFailure, newError),
+          )
+        },
       }),
     )
 }
@@ -119,6 +140,7 @@ export const map = <Output, NewOutput>(
   const applyF = (success: Success<Output>) => ({
     output: f(success.output),
     offset: success.offset,
+    furthestFailure: success.furthestFailure,
   })
   return (input, offset = 0n) => either.map(parser(input, offset), applyF)
 }
@@ -160,38 +182,32 @@ export const oneOf =
         }
       } else {
         // Success!
-        return result
+        return mutableFurthestOffset < 0n
+          ? result
+          : either.makeRight({
+              ...result.value,
+              furthestFailure: furthestOrUndefined(
+                result.value.furthestFailure,
+                failureAt(
+                  input,
+                  mutableFurthestOffset,
+                  mutableFurthestExpectations,
+                  mutableFurthestNotes,
+                ),
+              ),
+            })
       }
     }
 
-    const expected = new Set(mutableFurthestExpectations)
-
-    const [onlyExpectation, ...otherExpectations] = expected
-    const message =
-      onlyExpectation === undefined
-        ? 'unexpected input'
-        : otherExpectations.length === 0
-          ? `expected ${onlyExpectation}`
-          : `expected one of: ${[...expected].join(', ')}`
-
-    // Deduplicate notes.
-    const notes = mutableFurthestNotes.filter(
-      (note, index) =>
-        mutableFurthestNotes.findIndex(
-          otherNote =>
-            otherNote.offset === note.offset &&
-            otherNote.message === note.message,
-        ) === index,
-    )
-
     // If we haven't already returned then parsing failed.
-    return either.makeLeft({
-      source: input,
-      offset: mutableFurthestOffset,
-      message,
-      expected,
-      notes,
-    })
+    return either.makeLeft(
+      failureAt(
+        input,
+        mutableFurthestOffset,
+        mutableFurthestExpectations,
+        mutableFurthestNotes,
+      ),
+    )
   }
 type OneOfOutput<Parsers extends readonly Parser<unknown>[]> = {
   [Index in keyof Parsers]: OutputOf<Parsers[Index]>
@@ -226,12 +242,18 @@ export const sequence =
         parser,
       ) =>
         either.isRight(results)
-          ? either.map(parser(input, results.value.offset), newSuccess => ({
-              offset: newSuccess.offset,
-              output: [...results.value.output, newSuccess.output],
-            }))
+          ? either.map(
+              withPotentiallyFurtherFailure(results.value.furthestFailure)(
+                parser(input, results.value.offset),
+              ),
+              newSuccess => ({
+                offset: newSuccess.offset,
+                output: [...results.value.output, newSuccess.output],
+                furthestFailure: newSuccess.furthestFailure,
+              }),
+            )
           : results,
-      either.makeRight({ offset, output: [] }), // `parsers` is non-empty so this is never returned
+      either.makeRight({ offset, output: [], furthestFailure: undefined }), // `parsers` is non-empty so this is never returned
     )
     // The above `reduce` callback constructs `output` such that its
     // elements align with `Parsers`, but TypeScript doesn't know that.
@@ -250,17 +272,64 @@ export const zeroOrMore =
   // Uses a loop rather than recursion to avoid stack overflow.
   (input, offset = 0n) => {
     const output: Output[] = []
-    const mutableState = { output, offset }
+    const mutableState: {
+      output: Output[]
+      offset: bigint
+      furthestFailure: InvalidInputError | undefined
+    } = { output, offset, furthestFailure: undefined }
 
     let result = parser(input, mutableState.offset)
     while (either.isRight(result)) {
       mutableState.output.push(result.value.output)
       mutableState.offset = result.value.offset
+      mutableState.furthestFailure = furthestOrUndefined(
+        mutableState.furthestFailure,
+        result.value.furthestFailure,
+      )
       result = parser(input, mutableState.offset)
     }
 
-    return either.makeRight(mutableState)
+    return either.makeRight({
+      ...mutableState,
+      furthestFailure: furthestOrUndefined(
+        mutableState.furthestFailure,
+        result.value,
+      ),
+    })
   }
+
+const failureAt = (
+  input: string,
+  offset: bigint,
+  expectations: readonly string[],
+  notes: readonly Note[],
+): InvalidInputError => {
+  const expected = new Set(expectations)
+  return {
+    source: input,
+    offset,
+    message: messageForExpectations(expected),
+    expected,
+    notes: deduplicateNotes(notes),
+  }
+}
+
+const withPotentiallyFurtherFailure =
+  (carried: InvalidInputError | undefined) =>
+  <Output>(result: ParserResult<Output>): ParserResult<Output> =>
+    carried === undefined
+      ? result
+      : either.match(result, {
+          left: error => either.makeLeft(furthest(carried, error)),
+          right: success =>
+            either.makeRight({
+              ...success,
+              furthestFailure: furthestOrUndefined(
+                carried,
+                success.furthestFailure,
+              ),
+            }),
+        })
 
 type OutputOf<SpecificParser extends Parser<unknown>> = Extract<
   ReturnType<SpecificParser>['value'],

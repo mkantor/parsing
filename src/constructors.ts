@@ -16,6 +16,7 @@ export const anySingleCharacter: Parser<string> = (input, offset = 0n) => {
     return either.makeRight({
       output: firstCharacter,
       offset: offset + BigInt(firstCharacter.length),
+      furthestFailure: undefined,
     })
   }
 }
@@ -28,6 +29,7 @@ export const literal = <Text extends string>(text: Text): Parser<Text> => {
       ? either.makeRight({
           output: text,
           offset: offset + BigInt(text.length),
+          furthestFailure: undefined,
         })
       : either.makeLeft({
           source: input,
@@ -45,6 +47,7 @@ export const nothing: ParserWhichAlwaysSucceeds<undefined> = (
   either.makeRight({
     output: undefined,
     offset,
+    furthestFailure: undefined,
   })
 
 export const regularExpression = (pattern: RegExp): Parser<string> => {
@@ -69,6 +72,7 @@ export const regularExpression = (pattern: RegExp): Parser<string> => {
       : either.makeRight({
           output: match[0],
           offset: offset + BigInt(match[0].length),
+          furthestFailure: undefined,
         })
   }
 }
