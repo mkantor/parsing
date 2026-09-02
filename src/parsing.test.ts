@@ -5,6 +5,8 @@ import {
   as,
   butNot,
   flatMap,
+  hidden,
+  labeled,
   lazy,
   lookaheadNot,
   map,
@@ -292,6 +294,46 @@ suite('furthest failures survive backtracking', _ => {
       expected: new Set(['something else', '`z`']),
       notes: [note],
       offset: 0n,
+    })
+  })
+})
+
+suite('hidden', _ => {
+  test('contributes no expectations when something else failed', _ => {
+    const result = oneOf([hidden(literal('a')), literal('b')])('x')
+    assertFailureWithDetails(result, {
+      expected: new Set(['`b`']),
+      message: 'expected `b`',
+      offset: 0n,
+    })
+  })
+})
+
+suite('labeled', _ => {
+  test('replaces expectations when nothing was consumed', _ => {
+    const ab = labeled(sequence([literal('a'), literal('b')]), 'an ab')
+    assertFailureWithDetails(ab('xx'), {
+      expected: new Set(['an ab']),
+      message: 'expected an ab',
+      offset: 0n,
+    })
+  })
+
+  test('defers to a failure which got further', _ => {
+    const ab = labeled(sequence([literal('a'), literal('b')]), 'an ab')
+    assertFailureWithDetails(ab('ax'), {
+      expected: new Set(['`b`']),
+      message: 'input did not begin with `b`',
+      offset: 1n,
+    })
+  })
+
+  test('relabels a carried failure sitting where the parse ended', _ => {
+    const someAs = labeled(zeroOrMore(literal('a')), 'a run of `a`s')
+    assertFurthestFailure(someAs('aaab'), {
+      expected: new Set(['a run of `a`s']),
+      message: 'expected a run of `a`s',
+      offset: 3n,
     })
   })
 })

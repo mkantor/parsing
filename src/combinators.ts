@@ -85,6 +85,34 @@ export const flatMap =
     )
 
 /**
+ * Change the parser's description in error messages.
+ *
+ * @example
+ * ```ts
+ * labeled(oneOf([number, parenthesizedExpression]), 'an expression')
+ * ```
+ */
+export const labeled = <Output>(
+  parser: Parser<Output>,
+  label: string,
+): Parser<Output> => withExpectations(parser, new Set([label]))
+
+/**
+ * Omit `parser`'s expected values from errors.
+ *
+ * Intended for parsers whose absence is unsurprising, e.g. in many languages
+ * optional whitespace can appear almost anywhere and isn't useful to report in
+ * error messages.
+ *
+ * @example
+ * ```ts
+ * oneOf([hidden(whitespace), nothing])
+ * ```
+ */
+export const hidden = <Output>(parser: Parser<Output>): Parser<Output> =>
+  withExpectations(parser, noExpectations)
+
+/**
  * Create a `Parser` from a thunk. This can be useful for recursive parsers.
  */
 export const lazy =
@@ -297,6 +325,35 @@ export const zeroOrMore =
       ),
     })
   }
+
+const noExpectations: ReadonlySet<string> = new Set()
+
+const withExpectations = <Output>(
+  parser: Parser<Output>,
+  expected: ReadonlySet<string>,
+): Parser<Output> => {
+  const message = messageForExpectations(expected)
+  const relabeled = (error: InvalidInputError) => ({
+    ...error,
+    message,
+    expected,
+  })
+  return (input, offset = 0n) =>
+    either.match(parser(input, offset), {
+      left: error =>
+        either.makeLeft(error.offset === offset ? relabeled(error) : error),
+      right: success =>
+        either.makeRight(
+          success.furthestFailure !== undefined &&
+            success.furthestFailure.offset === success.offset
+            ? {
+                ...success,
+                furthestFailure: relabeled(success.furthestFailure),
+              }
+            : success,
+        ),
+    })
+}
 
 const failureAt = (
   input: string,
